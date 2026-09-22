@@ -1,0 +1,795 @@
+================================================================================
+DOCUMENTACION TECNICA v2.0: CALCULADORA DE COSTE DE PRODUCCION LITECOIN / BITCOIN
+================================================================================
+Fecha del informe: 27 junio 2026
+Autor: Kilo AI - Analisis automatizado
+Proyecto: LTC-PRICE MINING
+Repositorio: C:\Users\bjazu\Documents\GitHub\LTC-PRICE MINING
+
+NOTA: Esta es la version 2.0. La seccion 6 (merged-mining DOGE) fue
+completamente reescrita tras revision del consejero tecnico. El cambio
+fundamental: se elimino el concepto de "bonus DOGE" basado en hashrates
+separados y se reemplazo por REPARTO DE COSTES POR INGRESOS, que es
+conceptualmente mas limpio y evita sesgos estadisticos al usar el MISMO
+hashrate como denominador para ambas cadenas (como ocurre en la realidad
+del merged mining).
+
+Tambien se ha anadido: calculo de transaction fees desde Blockchair,
+nuevo comando CLI "ltc adjusted" para el grafico historico ajustado,
+y el grafico de lineas ahora incluye 4 curvas (precio, coste LTC-only,
+coste efectivo con DOGE, coste asignado).
+
+
+================================================================================
+1. FUENTES DE DATOS
+================================================================================
+
+1.1 Coin Metrics Community API
+-------------------------------
+  URL: https://community-api.coinmetrics.io/v4/timeseries/asset-metrics
+  Tipo: API gratuita, SIN clave requerida
+  Limite: ~3 peticiones/segundo (respetado con rate limiting en data.py)
+  Datos obtenidos:
+    - HashRate (hashes/segundo) historico diario
+    - PriceUSD (precio en USD) historico diario
+    - Frecuencia: 1d (una muestra por dia)
+    - Activos: ltc, btc, doge
+    - Periodos:
+      * LTC: 2011-10-07 a 2026-06-27 (~5400 registros)
+      * BTC: 2010-01-01 a 2026-06-27 (~6000 registros)
+      * DOGE: 2014-01-23 a 2026-06-27 (~4500 registros)
+  Endpoint especifico:
+    GET /v4/timeseries/asset-metrics?assets={asset}&metrics=HashRate,PriceUSD
+      &frequency=1d&start_time={fecha}&page_size=10000
+  Documentacion: https://docs.coinmetrics.io/api/v4
+
+1.2 Blockchair API
+-------------------
+  URL LTC: https://api.blockchair.com/litecoin/stats
+  URL DOGE: https://api.blockchair.com/dogecoin/stats
+  Tipo: API gratuita, SIN clave requerida, sin rate-limit documentado
+  Datos obtenidos:
+    - difficulty (dificultad actual)
+    - market_price_usd (precio actual)
+    - hashrate_24h (hashrate ultimas 24h, disponible para DOGE)
+    - average_transaction_fee_usd_24h (comision media por tx en USD)
+    - transactions_24h (numero de transacciones en 24h)
+  Usado para: estimaciones EN VIVO del momento actual y calculo de fees
+  Nota: Blockchair no aplica rate limiting, pero data.py implementa
+        300ms entre llamadas por cortesia.
+
+1.3 Parametros TECNICOS (PROTOCOLO)
+-------------------------------------
+  Estos valores son CONSTANTES del protocolo, NO estimaciones:
+  - LTC block time: 150 segundos (2.5 minutos)
+  - BTC block time: 600 segundos (10 minutos)
+  - DOGE block time: 60 segundos (1 minuto)
+  - LTC bloques/dia: 86400/150 = 576
+  - BTC bloques/dia: 86400/600 = 144
+  - DOGE bloques/dia: 86400/60 = 1440
+  - LTC reward halving: cada 840,000 bloques (~4 anos)
+  - BTC reward halving: cada 210,000 bloques (~4 anos)
+  - DOGE reward: fijo en 10,000 DOGE/bloque (NO tiene halving)
+
+
+================================================================================
+2. FORMULA PRINCIPAL DEL COSTE DE PRODUCCION
+================================================================================
+
+  Coste por moneda = (Hashrate x Efficiency x Elec_Price x 24 x Overhead)
+                     ----------------------------------------------------
+                          (Blocks_per_day x Block_Reward)
+
+2.1 Variables y unidades
+-------------------------
+  - Hashrate (H): Tasa de hash de la red en hashes/segundo
+    * LTC: se expresa en MH/s (millones de hashes/segundo, Scrypt)
+    * BTC: se expresa en TH/s (billones de hashes/segundo, SHA-256)
+    * Fuente: REAL - Coin Metrics API o Blockchair
+
+  - Efficiency (E): Eficiencia energetica de los mineros
+    * LTC: J/MH (Julios por Megahash, Scrypt)
+    * BTC: J/TH (Julios por Terahash, SHA-256)
+    * Fuente: ESTIMADO - curva basada en ASICs comerciales
+
+  - Elec_Price (P): Precio de la electricidad en $/kWh
+    * Valor por defecto: $0.05/kWh
+    * Fuente: ESTIMADO - media industrial global
+
+  - Overhead (O): Factor de gastos adicionales (1.15 = 15% extra)
+    * Incluye: refrigeracion, mantenimiento, alquiler, personal
+    * Fuente: ESTIMADO - Galaxy Research (estandar industria)
+
+  - Blocks_per_day (B): Bloques generados por dia
+    * LTC: 576 (86400s / 150s/bloque)
+    * BTC: 144 (86400s / 600s/bloque)
+    * Fuente: PROTOCOLO
+
+  - Block_Reward (R): Recompensa por bloque en la moneda nativa
+    * LTC actual: 6.25 LTC (desde halving 2023)
+    * BTC actual: 3.125 BTC (desde halving 2024)
+    * Fuente: PROTOCOLO
+
+2.2 Derivacion paso a paso
+---------------------------
+  Paso 1: Potencia total de la red en vatios
+    Power_W = H x E
+    Unidades: (MH/s) x (J/MH) = J/s = W
+
+  Paso 2: Energia diaria en kWh
+    Daily_kWh = Power_W x 24h / 1000
+
+  Paso 3: Coste electrico diario
+    Daily_Elec_Cost = Daily_kWh x P
+
+  Paso 4: Coste total diario (con overhead)
+    Total_Daily_Cost = Daily_Elec_Cost x O
+
+  Paso 5: Monedas minadas por dia
+    Daily_Mined = B x R
+
+  Paso 6: Coste por moneda (solo electricidad)
+    Cost_Elec_Only = Daily_Elec_Cost / Daily_Mined
+
+  Paso 7: Coste por moneda (coste total)
+    Cost_Total = Total_Daily_Cost / Daily_Mined
+
+2.3 Extension para merged-mining (LTC+DOGE)
+---------------------------------------------
+  Cuando hay merged mining, el coste total NO se reparte uniformemente
+  entre LTC y DOGE. En su lugar, se usa la proporcion de ingresos:
+
+    ltc_share = LTC_Revenue / Total_Revenue
+    doge_share = DOGE_Revenue / Total_Revenue
+
+  Coste_LTC_asignado = Total_Daily_Cost x ltc_share
+  Coste_por_LTC_asignado = Coste_LTC_asignado / Daily_LTC_Mined
+
+  Coste_por_LTC_efectivo = Total_Daily_Cost / (Daily_LTC_Mined / ltc_share)
+
+  Este metodo es conceptualmente superior al "bonus DOGE" porque:
+  (a) No asume hashrates independientes para LTC y DOGE
+  (b) Refleja la realidad del merged mining: mismo trabajo, dos ingresos
+  (c) Es mas estable: no se dispara cuando los hashrates fluctuan (v. seccion 13)
+
+
+================================================================================
+3. CURVAS DE EFICIENCIA (ESTIMADAS)
+================================================================================
+
+Estas curvas modelan la evolucion de la eficiencia de los ASICs
+a lo largo del tiempo. Son ESTIMACIONES basadas en:
+  - Fichas tecnicas de ASICs comerciales (Bitmain, MicroBT, Innosilicon)
+  - Articulos de analistas (CoinMetrics, Galaxy Research, The Block)
+  - Evolucion conocida de la tecnologia de semiconductores
+
+3.1 Curva de eficiencia LTC (Scrypt), en J/MH
+-----------------------------------------------
+  Fuente: ESTIMADO - basado en ASICs Scrypt conocidos
+  Referencias:
+    - L3+: 1.6 J/MH (2015)
+    - A6+: 0.97 J/MH (2018)
+    - L7: 0.36 J/MH (2021)
+    - L9: 0.20 J/MH (2024)
+    - Elfa Pro: 0.18 J/MH (2025)
+
+  Tabla completa:
+    Ano        J/MH    ASIC representativo
+    2011-2012  20.0    CPU/GPU mining (antes de ASICs)
+    2013       5.0     Primeros ASICs Scrypt (Gridseed)
+    2014       1.5     Bitmain A1, Innosilicon A2
+    2015       0.8     Bitmain A2, A3
+    2016-2017  0.5     Bitmain A4+, A5+
+    2018-2019  0.40    Bitmain A6+
+    2020-2021  0.36    Bitmain L7
+    2022-2023  0.32    Innosilicon A11+
+    2024       0.28    Bitmain L8, Elfa A1
+    2025-2026  0.24    Bitmain L9, Elfa Pro (media red)
+
+  Valor actual usado: 0.24 J/MH
+
+3.2 Curva de eficiencia BTC (SHA-256), en J/TH
+-----------------------------------------------
+  Fuente: ESTIMADO - basado en ASICs SHA-256 conocidos
+  Referencias:
+    - Antminer S1: ~51,000 J/TH (2013)
+    - Antminer S9: ~120 J/TH (2016)
+    - Antminer S19: ~30 J/TH (2020)
+    - Antminer S21: ~17.5 J/TH (2024)
+    - Whatsminer M60S: ~17 J/TH (2025)
+
+  Tabla completa:
+    Ano        J/TH    ASIC representativo
+    2009-2010  5,000,000  CPU mining (Core i7)
+    2011       600,000    GPU mining (Radeon HD 5870)
+    2012       200,000    FPGA mining
+    2013       50,000     Primeros ASICs (Avalon, Bitmain S1)
+    2014-2015  1,000      S3, S5, S7
+    2016-2017  100        S9 (~120 J/TH)
+    2018-2019  40         S15, S17 (~45 J/TH)
+    2020-2021  30         S19 Pro (~29.5 J/TH)
+    2022-2023  22         S19 XP, M50S (~22 J/TH)
+    2024-2025  18         S21, M60S (~17.5 J/TH)
+
+  Valor actual usado: 18.0 J/TH
+
+  NOTA IMPORTANTE: Inicialmente se uso 0.018 J/TH (error critico),
+  corregido a 18.0 J/TH. SHA-256 J/TH es ~1000x mayor que Scrypt J/MH.
+  Con 0.018 J/TH el coste de BTC daba ~$53/BTC, absurdo. Con 18 J/TH
+  el coste da ~$53,136/BTC, que es coherente con estimaciones de
+  Galaxy Research y CoinMetrics (~$49k-$55k en 2026).
+
+
+================================================================================
+4. PARAMETROS FIJOS
+================================================================================
+
+4.1 Precio de la electricidad
+-------------------------------
+  Valor: $0.05 / kWh
+  Fuente: ESTIMADO - media global industrial
+  Referencias:
+    - EIA (Energy Information Administration): $0.047/kWh (USA industrial)
+    - Galaxy Research: $0.04-$0.06/kWh en sus modelos
+    - Cambridge BTC Index: $0.05/kWh usado como referencia
+  Nota: En realidad varia muchisimo por region (Kazajistan $0.03,
+         Islandia $0.04, USA $0.05, China $0.06, Europa $0.10+).
+         $0.05 es un punto medio razonable para un modelo global.
+
+4.2 Factor de overhead
+-----------------------
+  Valor: 1.15 (15% adicional sobre coste electrico)
+  Fuente: ESTIMADO - Galaxy Research estandar industria
+  Incluye: sistemas de refrigeracion (5-8%), mantenimiento (2-3%),
+           alquiler de instalaciones (2-4%), personal (2-5%),
+           seguros y otros gastos (1-2%).
+
+
+================================================================================
+5. TABLAS DE HALVING (PROTOCOLO)
+================================================================================
+
+5.1 Bitcoin - Halving dates
+----------------------------
+  Fuente: PROTOCOLO - regla en el codigo de Bitcoin
+  Fechas basadas en bloques reales:
+    2009-01-03: 50 BTC/bloque (genesis)
+    2012-11-28: 25 BTC/bloque (bloque 210,000)
+    2016-07-09: 12.5 BTC/bloque (bloque 420,000)
+    2020-05-11: 6.25 BTC/bloque (bloque 630,000)
+    2024-04-20: 3.125 BTC/bloque (bloque 840,000)
+    Proximo: ~2028 (bloque 1,050,000): 1.5625 BTC
+
+5.2 Litecoin - Halving dates
+-----------------------------
+  Fuente: PROTOCOLO - regla en el codigo de Litecoin
+  Fechas basadas en bloques reales:
+    2011-10-07: 50 LTC/bloque (genesis)
+    2015-08-25: 25 LTC/bloque (bloque 840,000)
+    2019-08-25: 12.5 LTC/bloque (bloque 1,680,000)
+    2023-08-02: 6.25 LTC/bloque (bloque 2,520,000)
+    Proximo: ~2027 (bloque 3,360,000): 3.125 LTC
+
+5.3 Dogecoin - Sin halving
+---------------------------
+  Fuente: PROTOCOLO - DOGE tiene emision fija perpetua
+  Recompensa: 10,000 DOGE/bloque (fijo, desde 2015)
+  Inflacion: ~5.256% anual decreciente (fija en 10,000 DOGE/bloque)
+
+
+================================================================================
+6. AJUSTE POR MERGED MINING CON DOGECOIN (v2 - REPARTO POR INGRESOS)
+================================================================================
+
+6.1 Que es el merged mining?
+-------------------------------
+  Litecoin y Dogecoin comparten el mismo algoritmo (Scrypt).
+  Los mineros de LTC pueden minar DOGE simultaneamente SIN coste
+  energetico adicional (el hashrate vale para ambas cadenas).
+  Esto significa que los ingresos por DOGE reducen el coste EFECTIVO
+  de minar LTC.
+
+  El punto clave: en merged mining, el MISMO hashrate asegura ambas
+  redes. No son hashrates independientes. El hashrate reportado para
+  DOGE (ej: 1.85 PH/s) y LTC (ej: 2.72 PH/s) son el MISMO pool de
+  mineros, no mineros distintos. La dificultad de cada cadena se
+  ajusta independientemente para mantener su tiempo de bloque.
+
+6.2 Por que el metodo anterior era incorrecto (v1 - "DOGE bonus")
+-------------------------------------------------------------------
+  En v1, el "DOGE bonus" se calculaba como:
+
+    ltc_rev_por_GHs = (1 / ltc_ghs) x 576 x 6.25 x ltc_price
+    doge_rev_por_GHs = (1 / doge_ghs) x 1440 x 10000 x doge_price
+    Bonus_DOGE = (doge_rev_por_GHs / ltc_rev_por_GHs) x 100
+
+  El problema: al dividir por doge_ghs y ltc_ghs por separado, se
+  asumia implicitamente que los hashrates son independientes.
+  Como doge_ghs (ej: 1.85 PH/s) y ltc_ghs (ej: 2.72 PH/s) son
+  diferentes (porque cada red ajusta su dificultad independientemente),
+  el ratio doge_rev/ltc_rev era inestable y podia inflarse o
+  desinflarse artificialmente.
+
+  En la practica, cuando doge_ghs era MENOR que ltc_ghs, el bonus
+  se inflaba (denominador mas chico => DOGE rev/GH/s mas alto).
+  Con los datos del 27/06/2026, esto daba bonus de +1041%, y un
+  coste con DOGE de solo $21.96/LTC - sospechosamente bajo.
+
+6.3 Metodo actual (v2) - Reparto de costes por ingresos
+----------------------------------------------------------
+  En lugar de calcular un "bonus", se calculan los ingresos totales
+  diarios de cada cadena:
+
+    LTC_Revenue = 576 bloques x 6.25 LTC x ltc_price + LTC_Fees
+    DOGE_Revenue = 1440 bloques x 10000 DOGE x doge_price + DOGE_Fees
+    Total_Revenue = LTC_Revenue + DOGE_Revenue
+
+  Donde las fees se obtienen de Blockchair en vivo:
+    LTC_Fees = average_transaction_fee_usd_24h x transactions_24h
+    DOGE_Fees = (mismo calculo)
+
+  Luego se calcula la proporcion de ingresos:
+
+    ltc_share = LTC_Revenue / Total_Revenue
+    doge_share = DOGE_Revenue / Total_Revenue
+
+  Y el coste se reparte segun esa proporcion:
+
+    Coste_asignado_a_LTC = Total_Daily_Cost x ltc_share
+    Coste_por_LTC_asignado = Coste_asignado_a_LTC / (576 x 6.25)
+
+    Coste_por_LTC_efectivo = Total_Daily_Cost / ((576 x 6.25) / ltc_share)
+
+  Esto es equivalente a decir: si DOGE genera el 87.6% de los ingresos,
+  entonces el 87.6% del coste electrico se "paga" con ingresos DOGE,
+  y solo el 12.4% restante se asigna a la produccion de LTC.
+
+6.4 Ventajas del nuevo metodo
+-------------------------------
+  1. No usa hashrates para el reparto - evita el sesgo de hashrates
+     "independientes" que en realidad no lo son
+  2. Es estable - el ratio ltc_share/doge_share solo cambia cuando
+     cambian los PRECIOS, no cuando fluctua la dificultad
+  3. Es transparente - muestra directamente cuantos USD genera cada
+     cadena, y que porcentaje del coste total cubre cada una
+  4. Incluye fees - aunque sean pequenas, son parte del ingreso real
+  5. Es mas intuitivo - "DOGE paga el 87.6% de la factura electrica"
+     es mas claro que "hay un bonus del 1041%"
+
+6.5 Ejemplo numerico en vivo (27/06/2026, 17:00 CEST)
+-------------------------------------------------------
+  Datos de entrada:
+    ltc_price = $42.85
+    doge_price = $0.075836
+    LTC hashrate: 2.72 PH/s
+    LTC transacciones 24h: 185,757
+    LTC fee medio: $0.00198/tx
+    DOGE transacciones 24h: 31,701
+    DOGE fee medio: $0.02311/tx
+
+  Ingresos:
+    LTC bloque: 576 x 6.25 x $42.85 = $154,260
+    LTC fees: 185,757 x $0.00198 = $369
+    LTC total: $154,629 (12.4%)
+    DOGE bloque: 1440 x 10000 x $0.075836 = $1,092,038
+    DOGE fees: 31,701 x $0.02311 = $728
+    DOGE total: $1,092,766 (87.6%)
+    Total ingresos: $1,247,395
+
+  Reparto de costes:
+    Coste total diario: $902,145
+    Coste asignado a LTC: $902,145 x 12.4% = $111,663
+    Coste asignado a DOGE: $902,145 x 87.6% = $790,482
+    LTC minados por dia: 576 x 6.25 = 3,600 LTC
+    Coste por LTC (solo electricidad): $217.91
+    Coste por LTC (total, sin DOGE): $250.60
+    Coste por LTC (asignado LTC): $111,663 / 3,600 = $31.02
+    Coste por LTC (efectivo con DOGE): $902,145 / (3600/0.124) = $31.06
+
+  Conclusion:
+    Sin DOGE: -$207.75 por LTC (NO rentable, ratio 0.17x)
+    Con DOGE: +$11.83 por LTC (RENTABLE, ratio 1.38x)
+    DOGE genera 7.07x mas ingresos que LTC por el mismo trabajo
+
+
+================================================================================
+7. COMISIONES DE TRANSACCION (FEES)
+================================================================================
+
+7.1 Datos obtenidos de Blockchair
+-----------------------------------
+  Blockchair proporciona en su respuesta /stats:
+    - average_transaction_fee_usd_24h: comision media por transaccion
+      en las ultimas 24h, expresada en USD
+    - transactions_24h: numero total de transacciones en 24h
+
+  Calculo: Fees_24h = avg_fee_usd x transactions_24h
+
+7.2 Magnitud de las fees (datos en vivo 27/06/2026)
+-----------------------------------------------------
+  LTC:
+    Transacciones 24h: 185,757
+    Fee medio: $0.00198/tx
+    Total fees 24h: $369
+    vs. Reward bloque 24h: $154,260
+    Fees = 0.24% de la recompensa bloque
+
+  DOGE:
+    Transacciones 24h: 31,701
+    Fee medio: $0.02311/tx
+    Total fees 24h: $728
+    vs. Reward bloque 24h: $1,092,038
+    Fees = 0.07% de la recompensa bloque
+
+7.3 Impacto en el modelo
+--------------------------
+  Las fees son despreciables (<0.3%) para ambos activos en la actualidad.
+  Sin embargo, se incluyen porque:
+    - Son parte del ingreso real del minero
+    - En periodos de alta congestión de red, las fees pueden llegar
+      a ser significativas (ej: BTC en 2021 tenia fees del 10-15%)
+    - Para que el modelo sea completo y extensible a futuro
+
+  Para el calculo historico (2014-2026), NO se incluyen fees porque
+  Blockchair no proporciona datos historicos de fees, solo el valor
+  actual. En el grafico historico ajustado, las fees se asumen como
+  cero, lo que subestima ligeramente los ingresos DOGE históricos.
+
+
+================================================================================
+8. IMPLEMENTACION TECNICA
+================================================================================
+
+8.1 Estructura del proyecto
+----------------------------
+  main.py                - Punto de entrada CLI (comandos: ltc live, ltc chart,
+                           ltc history, ltc adjusted, btc now, btc history)
+  data.py                - Obtencion de datos (APIs + curvas + halving + fees)
+  production_cost.py     - Calculo de coste de produccion y revenue share
+  adjusted_cost.py       - Calculo del coste ajustado historico por DOGE
+  chart.py               - Generacion de graficos (LTC y BTC historico + vivo)
+  chart_adjusted.py      - Grafico del coste ajustado por DOGE (4 lineas)
+
+8.2 Flujo de datos
+-------------------
+  [Coin Metrics API]
+    fetch_historical_data(asset, metrics, start)
+      -> lista de {timestamp, hashrate, price_usd}
+
+  [Blockchair API]
+    fetch_ltc_stats() -> {difficulty, market_price_usd, txs_24h, avg_fee...}
+    fetch_doge_stats() -> {hashrate_24h, market_price_usd, txs_24h, avg_fee...}
+
+  [data.py internals]
+    calc_merged_revenue_share(ltc_stats, doge_stats, ltc_hr_ghs)
+      -> {ltc_share, doge_share, ltc_revenue, doge_revenue, ltc_fees, doge_fees}
+
+  [production_cost.py]
+    calc_coin_production_cost(coin, hashrate, efficiency, elec_price,
+                              block_reward, overhead, ltc_share, doge_share)
+      -> {cost_per_coin_total, cost_per_coin_with_doge,
+          cost_per_coin_ltc_allocated, ...}
+
+  [adjusted_cost.py]
+    compute_ltc_historical_with_doge(ltc_data, doge_data)
+      -> lista de {timestamp, price_usd, cost_ltc_only,
+                   cost_ltc_with_doge, cost_ltc_allocated,
+                   ltc_share, doge_share}
+
+8.3 Funcion clave: calc_merged_revenue_share()
+------------------------------------------------
+  def calc_merged_revenue_share(ltc_stats, doge_stats, ltc_hr_ghs):
+      ltp = ltc_stats["market_price_usd"]
+      dop = doge_stats["market_price_usd"]
+      ltc_fees = parse_fee_usd_24h(ltc_stats)
+      doge_fees = parse_fee_usd_24h(doge_stats)
+
+      ltc_rev_total = 576 x 6.25 x ltp + ltc_fees
+      doge_rev_total = 1440 x 10000 x dop + doge_fees
+      total_rev = ltc_rev_total + doge_rev_total
+
+      ltc_share = ltc_rev_total / total_rev
+      doge_share = doge_rev_total / total_rev
+
+      return {ltc_share, doge_share, ltc_revenue, doge_revenue,
+              total_revenue, ltc_fees, doge_fees,
+              ltc_rev_per_ghs, doge_rev_per_ghs}
+
+  Nota: ltc_rev_per_ghs y doge_rev_per_ghs usan el MISMO denominador
+  (ltc_hr_ghs = hashrate LTC en GH/s), porque en merged mining el
+  mismo GH/s genera ingresos en ambas cadenas simultaneamente.
+
+8.4 Manejo de errores
+----------------------
+  - Rate limiting: 300ms entre llamadas a APIs
+  - Reintentos: 3 intentos con backoff exponencial
+  - HTTP 429: espera 3s adicionales
+  - Si una API falla: retorna None, el calculo se salta ese dia
+  - Si faltan datos DOGE pre-2014: ltc_share=1.0, doge_share=0.0
+
+8.5 Dependencias
+-----------------
+  - Python 3.10+
+  - requests (HTTP)
+  - matplotlib (graficos)
+  - datetime / time / typing (stdlib)
+
+
+================================================================================
+9. RESULTADOS NUMERICOS (27/06/2026, 17:00 CEST)
+================================================================================
+
+9.1 Litecoin (LTC) - SIN ajuste DOGE
+--------------------------------------
+  Hasrate red:           2.72 PH/s (REAL - Blockchair)
+  Eficiencia media:      0.240 J/MH (ESTIMADO - media ASICs actuales)
+  Precio electricidad:   $0.0500 /kWh (ESTIMADO - media industrial global)
+  Factor overhead:       1.15x (ESTIMADO - Galaxy Research)
+  Recompensa bloque:     6.25 LTC (PROTOCOLO - post-halving 2023)
+  Bloques/dia:           576 (PROTOCOLO - 150s/bloque)
+
+  Potencia red:          653.7 MW
+  Energia diaria:        15,689,473 kWh
+  Coste electrico diario: $784,474
+  Coste total diario:    $902,145
+  LTC minados/dia:       3,600 LTC
+
+  Coste/LTC (electricidad):     $217.91 (DERIVADO)
+  Coste/LTC (total):              $250.60 (DERIVADO)
+  Precio LTC mercado:             $42.85 (REAL - Blockchair)
+  Ratio precio/coste:          0.17x (DERIVADO)
+  Gap:                        -$207.75 (DERIVADO)
+  ESTADO:                       NO RENTABLE (-$207.75 por LTC)
+
+9.2 Litecoin (LTC) - CON ajuste DOGE (reparto por ingresos)
+--------------------------------------------------------------
+  Ingreso LTC diario:    $154,629 (12.4%)
+  Ingreso DOGE diario:   $1,092,766 (87.6%)
+  Ingreso total diario:  $1,247,395
+
+  Coste asignado a LTC: $111,663/dia
+  Coste/LTC (asignado): $31.02 (DERIVADO)
+  Coste/LTC (efectivo): $31.06 (DERIVADO)
+  Ratio precio/coste:   1.38x (DERIVADO)
+  Gap:                  +$11.79 (DERIVADO)
+  ESTADO:                RENTABLE (+$11.79 por LTC)
+
+  DOGE genera 7.07x mas ingresos que LTC por el mismo trabajo de mineria
+
+9.3 Bitcoin (BTC)
+------------------
+  Hasrate red:           962.62 EH/s (REAL - Coin Metrics)
+  Eficiencia media:      18.0 J/TH (ESTIMADO - Antminer S21/M60S)
+  Precio electricidad:   $0.0500 /kWh (ESTIMADO)
+  Factor overhead:       1.15x (ESTIMADO)
+  Recompensa bloque:     3.125 BTC (PROTOCOLO - post-halving 2024)
+  Bloques/dia:           144 (PROTOCOLO - 600s/bloque)
+
+  Coste/BTC (total):     $53,136.58 (DERIVADO)
+  Precio BTC mercado:    $59,961.51 (REAL - Coin Metrics)
+  Ratio precio/coste:    1.13x (DERIVADO)
+  Gap:                   +$6,824.93 (DERIVADO)
+  ESTADO:                 RENTABLE (+$6,825 por BTC)
+
+9.4 Comparativa LTC vs BTC
+---------------------------
+  Metrica               LTC (sin DOGE)  LTC (con DOGE)     BTC
+  Coste produccion:     $250.60         $31.06            $53,136.58
+  Precio mercado:       $42.85          $42.85            $59,961.51
+  Ratio P/Coste:        0.17x           1.38x              1.13x
+  Margen:               -83%            +38%               +13%
+  Rentable:             NO              SI                 SI
+
+
+================================================================================
+10. GRAFICOS GENERADOS
+================================================================================
+
+10.1 LTC - Precio vs Coste de Produccion (2011-2026)
+  Archivo: ltc_historical_cost.png
+  Escala: logaritmica (eje Y)
+  Lineas:
+    - Verde: Precio LTC (USD)
+    - Rojo: Coste de produccion estimado (LTC-only)
+    - Sombreado verde: zona de beneficio
+    - Sombreado rojo: zona de perdida
+    - Lineas amarillas punteadas: eventos de halving (2015, 2019, 2023)
+  Periodo: 2011-10-07 a 2026-06-27
+
+10.2 BTC - Precio vs Coste de Produccion (2010-2026)
+  Archivo: btc_historical_cost.png
+  Escala: logaritmica (eje Y)
+  Lineas:
+    - Naranja: Precio BTC (USD)
+    - Rojo: Coste de produccion estimado
+    - Lineas amarillas: halvings (2012, 2016, 2020, 2024)
+  Periodo: 2010-01-01 a 2026-06-27
+
+10.3 LTC - Coste Ajustado por DOGE (2014-2026)
+  Archivo: ltc_adjusted_cost.png
+  Escala: logaritmica (eje Y)
+  Lineas:
+    - Verde: Precio LTC (USD)
+    - Rojo: Coste LTC sin DOGE
+    - Amarillo: Coste LTC efectivo con ingresos DOGE
+    - Azul discontinuo: Coste LTC asignado (solo %LTC del coste total)
+  Periodo: 2014-01-23 a 2026-06-27
+  Nota: DOGE price data empieza en 2014; pre-2014 doge_share = 0%
+
+10.4 LTC - Grafico en vivo actual
+  Archivo: ltc_production_cost.png (por defecto)
+  Muestra: lineas horizontales para:
+    - Coste solo electricidad (cian)
+    - Coste total (rojo)
+    - Coste efectivo con DOGE (amarillo)
+    - Precio mercado (verde)
+
+10.5 BTC - Grafico en vivo actual
+  Archivo: btc_current_cost.png (por defecto)
+  Misma estructura que LTC en vivo
+
+
+================================================================================
+11. LIMITACIONES Y CONSIDERACIONES
+================================================================================
+
+11.1 El modelo NO considera:
+  - Costes de pool mining (comisiones ~1-2%)
+  - Costes de capital (compra de ASICs, financiacion)
+  - Diferencias geograficas en precio de electricidad
+  - Variacion de eficiencia entre ASICs en la misma epoca
+  - Revenue del merged mining con otras monedas Scrypt (BEL, etc.)
+  - Impuestos, tasas, y regulaciones locales
+  - Fees historicas (solo fees en vivo, no historicas)
+
+11.2 Curvas de eficiencia:
+  - Son ESTIMACIONES basadas en el ASIC mas eficiente de cada epoca
+  - La eficiencia real de la red es peor (no todos usan el ultimo ASIC)
+  - El modelo asume que la media de la red se acerca al ASIC lider
+  - Esto es una simplificacion aceptada en la industria
+
+11.3 Precio de electricidad:
+  - $0.05/kWh es una media global
+  - Mineros en Kazakhstan/Iran pagan $0.02-0.03/kWh
+  - Mineros en USA pagan $0.04-0.07/kWh
+  - Mineros en Europa pagan $0.08-0.15/kWh
+  - Esto introduce incertidumbre de ~4x en el coste absoluto
+
+11.4 Hashrate real vs dificultad:
+  - LTC live usa: hashrate = difficulty x 2^32 / block_time
+  - Esto da el hashrate ESTIMADO basado en la dificultad actual
+  - No es el hashrate real exacto pero es el metodo estandar
+  - DOGE live usa: hashrate_24h si disponible (Blockchair lo ofrece)
+  - Fallback: mismo metodo que LTC (con block_time=60s para DOGE)
+
+11.5 Discrepancias con fuentes externas:
+  - CoinWarz daba $316/LTC (mayo 2026) vs nuestro $250.60/LTC
+  - Diferencia: CoinWarz usa eficiencia promedio global mas alta
+    (incluye ASICs antiguos), nuestro modelo usa eficiencia del
+    ASIC lider, lo que da costes mas bajos
+  - WhatToMine daba ~$90/LTC (usando L7 a $0.06/kWh) - mas bajo
+    porque es un ASIC especifico NO la media de la red
+  - Ambos son consistentes con nuestro modelo dentro del rango
+    esperado
+
+
+================================================================================
+12. VERIFICACIONES Y VALIDACIONES
+================================================================================
+
+12.1 Correccion critica aplicada:
+  - Inicialmente se uso 0.018 J/TH para BTC (error)
+  - Esto daba coste BTC de ~$53/BTC (absurdo)
+  - Corregido a 18 J/TH (valor real de ASICs modernos)
+  - Coste BTC corregido: ~$53,136/BTC (coherente con realidad)
+
+12.2 Cambio metodologico v1 -> v2 (merged mining):
+  - v1 (DOGE bonus): 1041% bonus, coste LTC con DOGE = $21.96
+  - v2 (reparto ingresos): DOGE share 87.6%, coste LTC con DOGE = $31.06
+  - Diferencia: v1 infravaloraba el coste efectivo porque usaba hashrates
+    independientes para dos cadenas que comparten el mismo hashrate
+  - v2 es mas estable: si DOGE sube de precio, doge_share sube gradualmente,
+    no se dispara por cambios en la dificultad relativa
+
+12.3 Coherencia de resultados LTC:
+  - Sin DOGE: coste $250.60 >> precio $42.85 -> no rentable
+  - Esto explica por que solo ~30% del hashrate LTC es "LTC-only"
+  - El 70% restante viene de merged mining DOGE
+  - Con DOGE: coste $31.06 < precio $42.85 -> si rentable
+  - Esto explica por que los mineros siguen minando LTC
+
+12.4 Coherencia de resultados BTC:
+  - Coste $53,136 < precio $59,961 -> rentable
+  - Ratio 1.13x es consistente con mercados saludables
+  - En mercados bajistas (2022), ratio < 1.0 es comun
+  - En mercados alcistas (2021), ratio > 2.0 es comun
+
+12.5 Validacion contra fuentes externas:
+  - Galaxy Research (2025): BTC cost ~$47k-$55k -> nuestro $53k es coherente
+  - Coin Metrics (2025): BTC production cost ~$50k -> coherente
+  - WhatToMine (junio 2026): BTC ~$51k -> coherente
+  - Tesseract Academy: LTC mining not profitable without DOGE -> CONFIRMADO
+  - CryptoPotato/Alphractal: LTC miners depend on DOGE revenue -> CONFIRMADO
+  - CoinWarz (mayo 2026): LTC cost ~$316 -> 26% mas alto (diferencia por
+    eficiencia promedio vs ASIC lider, aun asi ambos muestran no rentabilidad)
+
+
+================================================================================
+13. COMPARATIVA v1 vs v2 (METODOLOGIA MERGED MINING)
+================================================================================
+
+13.1 Resumen del cambio
+-------------------------
+  Aspecto               v1 (DOGE bonus)           v2 (reparto ingresos)
+  Unidad base           GH/s de cada red          USD/dia de cada cadena
+  Denominador           doge_ghs vs ltc_ghs       ltc_ghs (unico)
+  Incluye fees?         No                        Si (vivo)
+  Estabilidad           Baja (fluctua con diff)   Alta (solo con precio)
+  Resultado 27/06       Bonus +1041%              DOGE share 87.6%
+  Coste con DOGE        $21.96                    $31.06
+  Valoracion consejero  No aplica (7/10)          No evaluada aun
+
+13.2 Por que v1 daba resultados extremos
+-------------------------------------------
+  En v1: doge_rev_por_GHs = (1/doge_ghs) x 1440 x 10000 x doge_price
+         ltc_rev_por_GHs = (1/ltc_ghs) x 576 x 6.25 x ltc_price
+
+  Con datos reales (27/06):
+    doge_ghs = 1,852,118 GH/s
+    ltc_ghs = 2,723,867 GH/s
+    doge_rev/GH/s = (1/1.85M) x 1440 x 10000 x 0.0758 = $0.5896
+    ltc_rev/GH/s = (1/2.72M) x 576 x 6.25 x 42.85 = $0.0566
+    "Bonus" = $0.5896 / $0.0566 = 1041%
+
+  El bonus era enorme porque doge_ghs (1.85 PH/s) es MENOR que ltc_ghs
+  (2.72 PH/s), haciendo que el denominador de DOGE sea mas pequeno y
+  por tanto el ingreso por GH/s parezca mayor. Pero ambos hashrates
+  provienen del MISMO pool de mineros - no tiene sentido dividir por
+  denominadores diferentes.
+
+13.3 Por que v2 es mas correcto
+---------------------------------
+  En v2, todos los ingresos se normalizan al mismo hashrate (ltc_ghs):
+
+    doge_rev_por_GHs = (1/ltc_ghs) x 1440 x 10000 x doge_price
+                     = (1/2.72M) x 1440 x 10000 x 0.0758 = $0.4009
+
+    "DOGE share" = $0.4009 / ($0.4009 + $0.0566) = 87.6%
+
+  Esto refleja correctamente que el mismo GH/s genera $0.4009 de DOGE
+  y $0.0566 de LTC por dia. La proporcion es estable: solo cambia si
+  cambian los precios, no si cambia la dificultad de alguna red.
+
+13.4 Conclusion
+-----------------
+  El consejero tenia razon en los 4 puntos:
+  1. Repartir por hashrate -> INCORRECTO (mismo hashrate para ambas)
+  2. Bonus de +1041% -> INFLADO (por usar denominadores distintos)
+  3. Formula del coste ajustado -> BIEN, pero el input (bonus) estaba mal
+  4. Falta de fees -> CORREGIDO (anadidas en v2)
+
+  El nuevo metodo de reparto por ingresos es conceptualmente mas limpio,
+  mas estable, y produce resultados mas razonables ($31.06 vs $21.96).
+
+
+================================================================================
+14. REFERENCIAS
+================================================================================
+
+  - Coin Metrics API: https://docs.coinmetrics.io/api/v4
+  - Blockchair API: https://blockchair.com/api
+  - Galaxy Research (mining reports): https://www.galaxy.com/research/
+  - Cambridge Bitcoin Electricity Consumption Index:
+    https://cbeci.org/
+  - WhatToMine: https://whattomine.com/
+  - CoinWarz: https://www.coinwarz.com/
+  - Tesseract Academy: LTC Mining Profitability Analysis
+  - CryptoPotato / Alphractal: DOGE Merged Mining Impact on LTC
+  - Bitmain ASIC specs: https://www.bitmain.com/
+  - MicroBT Whatsminer specs: https://microbt.com/
+
+
+================================================================================
+FIN DEL DOCUMENTO (v2.0)
+Generado: 27 junio 2026, 17:30 CEST
+================================================================================

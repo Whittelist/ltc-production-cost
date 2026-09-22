@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Litecoin Production Cost Analyzer</title>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
+<script src="chart_data.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0d1117; --bg2: #161b22; --bg3: #1c2333; --border: #30363d;
+  --text: #e6edf3; --text2: #8b949e; --accent: #58a6ff;
+  --green: #3fb950; --red: #f85149; --yellow: #d29922; --cyan: #39d2c0;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.6; font-size: 15px;
+}
+.container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+/* HEADER */
+header {
+  background: var(--bg2); border-bottom: 1px solid var(--border); padding: 16px 0; position: sticky; top: 0; z-index: 100;
+}
+header .container { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+header h1 { font-size: 20px; font-weight: 700; color: var(--text); }
+header h1 span { color: var(--accent); }
+.lang-btn {
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 6px 14px;
+  border-radius: 6px; cursor: pointer; font-size: 13px; transition: .2s;
+}
+.lang-btn:hover { border-color: var(--accent); color: var(--accent); }
+/* HERO */
+.hero {
+  text-align: center; padding: 50px 20px 40px; background: linear-gradient(180deg, #0d1117 0%, #161b22 100%);
+}
+.hero h2 { font-size: 28px; font-weight: 700; margin-bottom: 12px; }
+.hero p { color: var(--text2); font-size: 16px; max-width: 700px; margin: 0 auto 10px; }
+.hero .badge {
+  display: inline-block; background: rgba(63,185,80,0.15); color: var(--green); padding: 6px 18px;
+  border-radius: 20px; font-size: 14px; font-weight: 600; margin-top: 16px; border: 1px solid rgba(63,185,80,0.3);
+}
+.hero .badge.red { background: rgba(248,81,73,0.15); color: var(--red); border-color: rgba(248,81,73,0.3); }
+.hero .badge.yellow { background: rgba(210,153,34,0.15); color: var(--yellow); border-color: rgba(210,153,34,0.3); }
+/* CHART */
+.chart-section { padding: 30px 0; }
+.chart-container {
+  background: #131722; border: 1px solid #2a2e39; border-radius: 8px; padding: 16px;
+  position: relative;
+}
+#chart { width: 100%; height: 500px; }
+.chart-legend {
+  display: flex; gap: 24px; flex-wrap: wrap; padding: 16px 16px 0;
+}
+.chart-legend .item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text2); }
+.chart-legend .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.chart-dates { 
+  display: flex; justify-content: space-between; padding: 8px 16px 0; font-size: 12px; color: var(--text2);
+}
+/* STATS CARDS */
+.stats { padding: 20px 0; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.stat-card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 20px;
+}
+.stat-card .label { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+.stat-card .value { font-size: 24px; font-weight: 700; }
+.stat-card .sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+.stat-card .src { font-size: 10px; color: var(--text2); opacity: .6; margin-top: 4px; }
+.green { color: var(--green); } .red { color: var(--red); } .yellow { color: var(--yellow); } .cyan { color: var(--cyan); }
+/* METHODOLOGY */
+.methodology { padding: 40px 0; }
+.methodology h3 { font-size: 22px; font-weight: 700; margin-bottom: 24px; }
+.methodology h4 { font-size: 16px; font-weight: 600; margin: 20px 0 10px; color: var(--accent); }
+.methodology p, .methodology li { color: var(--text2); margin-bottom: 8px; }
+.methodology ul { padding-left: 20px; }
+.methodology .formula {
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 16px 20px;
+  margin: 16px 0; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 14px; overflow-x: auto;
+}
+.methodology .formula .hl-green { color: var(--green); } .methodology .formula .hl-red { color: var(--red); }
+.methodology .formula .hl-yellow { color: var(--yellow); } .methodology .formula .hl-cyan { color: var(--cyan); }
+.methodology .formula .hl { color: var(--accent); }
+/* TABLE */
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: 14px; }
+th { color: var(--text2); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+td { color: var(--text); }
+tr:hover { background: var(--bg3); }
+/* FOOTER */
+footer {
+  border-top: 1px solid var(--border); padding: 30px 0; text-align: center; color: var(--text2); font-size: 13px;
+}
+footer a { color: var(--accent); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .hero h2 { font-size: 22px; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  #chart { height: 350px; }
+}
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr; }
+  header h1 { font-size: 16px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+<div class="container">
+  <h1><span>LTC</span> Production Cost Analyzer</h1>
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <span id="liveStatus" style="font-size:12px;color:var(--text2)">&#8987; cargando...</span>
+    <button class="lang-btn" id="langToggle">English</button>
+  </div>
+</div>
+</header>
+
+<section class="hero">
+<div class="container">
+  <h2 id="heroTitle" data-es="&iquest;Cu&aacute;nto cuesta minar 1 Litecoin?" data-en="How much does it cost to mine 1 Litecoin?">
+    &iquest;Cu&aacute;nto cuesta minar 1 Litecoin?
+  </h2>
+  <p id="heroDesc" data-es="
+    Los mineros de Litecoin gastan ~$250 USD en electricidad por cada LTC minado. 
+    Pero gracias al merged-mining con Dogecoin, el coste efectivo se reduce 
+    a solo ~$31. Sin DOGE, minar LTC no ser&iacute;a rentable.
+  " data-en="
+    Litecoin miners spend ~$250 USD in electricity per LTC mined. 
+    But thanks to merged-mining with Dogecoin, the effective cost drops 
+    to just ~$31. Without DOGE, mining LTC wouldn't be profitable.
+  ">
+    Los mineros de Litecoin gastan ~$250 USD en electricidad por cada LTC minado.
+    Pero gracias al merged-mining con Dogecoin, el coste efectivo se reduce
+    a solo ~$31. Sin DOGE, minar LTC no ser&iacute;a rentable.
+  </p>
+  <div>
+    <span id="heroBadge" class="badge" data-es="LTC solo: NO rentable (-$208)" data-en="LTC only: NOT profitable (-$208)">
+      LTC solo: NO rentable (-$208)
+    </span>
+    <span id="heroBadge2" class="badge" data-es="Con DOGE: Rentable (+$12/LTC)" data-en="With DOGE: Profitable (+$12/LTC)">
+      Con DOGE: Rentable (+$12/LTC)
+    </span>
+  </div>
+</div>
+</section>
+
+<section class="stats">
+<div class="container">
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="label" data-es="Coste LTC (solo electricidad)" data-en="LTC Cost (electricity only)">Coste LTC (solo electricidad)</div>
+    <div class="value red" id="statElecOnly">$217.91</div>
+    <div class="sub" data-es="por LTC minado" data-en="per LTC mined">por LTC minado</div>
+    <div class="src" data-es="FUENTE: Derivado - Hashrate x Eficiencia x Precio Elect." data-en="SOURCE: Derived - Hashrate x Efficiency x Elec. Price">
+      FUENTE: Derivado - Hashrate x Eficiencia x Precio Elect.
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="label" data-es="Coste LTC (total + overhead)" data-en="LTC Cost (total + overhead)">Coste LTC (total + overhead)</div>
+    <div class="value red" id="statTotal">$250.60</div>
+    <div class="sub" data-es="incluye 15% overhead" data-en="includes 15% overhead">incluye 15% overhead</div>
+    <div class="src" data-es="FUENTE: Galaxy Research est&aacute;ndar industria" data-en="SOURCE: Galaxy Research industry standard">
+      FUENTE: Galaxy Research est&aacute;ndar industria
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="label" data-es="Coste LTC efectivo (con DOGE)" data-en="Effective LTC Cost (w/ DOGE)">Coste LTC efectivo (con DOGE)</div>
+    <div class="value green" id="statEff">$31.06</div>
+    <div class="sub" id="statEffSub" data-es="DOGE genera 87.6% de los ingresos" data-en="DOGE generates 87.6% of revenue">DOGE genera 87.6% de los ingresos</div>
+    <div class="src" data-es="FUENTE: Reparto por ingresos (merged-mining)" data-en="SOURCE: Revenue-share method (merged-mining)">
+      FUENTE: Reparto por ingresos (merged-mining)
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="label" data-es="Precio LTC mercado" data-en="LTC Market Price">Precio LTC mercado</div>
+    <div class="value cyan" id="statPrice">$42.85</div>
+    <div class="sub" id="statPriceSub" data-es="27 junio 2026" data-en="June 27, 2026">27 junio 2026</div>
+    <div class="src" data-es="FUENTE: Blockchair API" data-en="SOURCE: Blockchair API">FUENTE: Blockchair API</div>
+  </div>
+</div>
+</div>
+</section>
+
+<section class="chart-section">
+<div class="container">
+<div class="chart-container">
+  <div class="chart-legend">
+    <div class="item"><span class="dot" style="background:#26a69a"></span> <span data-es="Precio LTC (USD)" data-en="LTC Price (USD)">Precio LTC (USD)</span></div>
+    <div class="item"><span class="dot" style="background:#ef5350"></span> <span data-es="Coste LTC sin DOGE" data-en="LTC Cost w/o DOGE">Coste LTC sin DOGE</span></div>
+    <div class="item"><span class="dot" style="background:#ffa726"></span> <span data-es="Coste LTC efectivo (con DOGE)" data-en="LTC Effective Cost (w/ DOGE)">Coste LTC efectivo (con DOGE)</span></div>
+  </div>
+  <div id="chart"></div>
+</div>
+</div>
+</section>
+
+<section class="methodology">
+<div class="container">
+<h3 id="methodTitle" data-es="Metodolog&iacute;a" data-en="Methodology">Metodolog&iacute;a</h3>
+
+<h4 id="m1" data-es="F&oacute;rmula principal" data-en="Main formula">F&oacute;rmula principal</h4>
+<div class="formula">
+  Coste = <span class="hl">(Hashrate &times; Efficiency &times; Elec_Price &times; 24 &times; Overhead)</span><br>
+  <span style="padding-left:8px">/</span> (Blocks_per_day &times; Block_Reward)
+</div>
+
+<table>
+<tr><th data-es="Variable" data-en="Variable">Variable</th><th data-es="Valor" data-en="Value">Valor</th><th data-es="Fuente" data-en="Source">Fuente</th><th data-es="Tipo" data-en="Type">Tipo</th></tr>
+<tr><td data-es="Hashrate red LTC" data-en="LTC Network Hashrate">Hashrate red LTC</td><td id="mHashrate">2.72 PH/s</td><td>Blockchair</td><td>REAL</td></tr>
+<tr><td data-es="Eficiencia media" data-en="Avg Efficiency">Eficiencia media</td><td>0.240 J/MH</td><td data-es="Curva ASICs (L7-L9)" data-en="ASIC curve (L7-L9)">Curva ASICs (L7-L9)</td><td>ESTIMADO</td></tr>
+<tr><td data-es="Precio electricidad" data-en="Electricity Price">Precio electricidad</td><td>$0.05/kWh</td><td>EIA / Galaxy Research</td><td>ESTIMADO</td></tr>
+<tr><td data-es="Factor overhead" data-en="Overhead factor">Factor overhead</td><td>1.15x (15%)</td><td>Galaxy Research</td><td>ESTIMADO</td></tr>
+<tr><td data-es="Bloques/d&iacute;a LTC" data-en="LTC Blocks/day">Bloques/d&iacute;a LTC</td><td>576</td><td data-es="Protocolo (150s/bloque)" data-en="Protocol (150s/block)">Protocolo (150s/bloque)</td><td>PROTOCOLO</td></tr>
+<tr><td data-es="Recompensa bloque" data-en="Block reward">Recompensa bloque</td><td>6.25 LTC</td><td data-es="Halving 2023" data-en="2023 Halving">Halving 2023</td><td>PROTOCOLO</td></tr>
+</table>
+
+<h4 id="m2" data-es="Ajuste por merged-mining DOGE" data-en="DOGE merged-mining adjustment">Ajuste por merged-mining DOGE</h4>
+<p data-es="
+  Litecoin y Dogecoin comparten el algoritmo Scrypt. Los mineros de LTC pueden 
+  minar DOGE simult&aacute;neamente sin coste energ&eacute;tico adicional. El coste 
+  total se reparte seg&uacute;n la proporci&oacute;n de ingresos que genera cada cadena.
+" data-en="
+  Litecoin and Dogecoin share the Scrypt algorithm. LTC miners can mine DOGE 
+  simultaneously with no extra energy cost. The total cost is split according to 
+  the revenue share each chain generates.
+">
+  Litecoin y Dogecoin comparten el algoritmo Scrypt. Los mineros de LTC pueden
+  minar DOGE simult&aacute;neamente sin coste energ&eacute;tico adicional. El coste
+  total se reparte seg&uacute;n la proporci&oacute;n de ingresos que genera cada cadena.
+</p>
+
+<div class="formula">
+  <span class="hl-cyan">LTC_share</span> = LTC_Revenue / (LTC_Revenue + DOGE_Revenue)<br>
+  <span class="hl-yellow">DOGE_share</span> = DOGE_Revenue / (LTC_Revenue + DOGE_Revenue)<br><br>
+  <span class="hl-green">Coste_LTC_efectivo</span> = Total_Daily_Cost / (Daily_LTC_Mined / LTC_share)
+</div>
+
+<table>
+<tr><th data-es="M&eacute;trica" data-en="Metric">M&eacute;trica</th><th data-es="Valor" data-en="Value">Valor</th></tr>
+<tr><td data-es="Ingreso LTC diario" data-en="Daily LTC Revenue">Ingreso LTC diario</td><td id="mRevLtc">$154,629 (12.4%)</td></tr>
+<tr><td data-es="Ingreso DOGE diario" data-en="Daily DOGE Revenue">Ingreso DOGE diario</td><td id="mRevDoge">$1,092,766 (87.6%)</td></tr>
+<tr><td data-es="Coste total red/d&iacute;a" data-en="Total daily network cost">Coste total red/d&iacute;a</td><td id="mTotalCost">$902,145</td></tr>
+<tr><td class="green" data-es="Coste efectivo por LTC" data-en="Effective cost per LTC"><b>Coste efectivo por LTC</b></td><td class="green" id="mEffCost"><b>$31.06</b></td></tr>
+</table>
+
+<h4 id="m3" data-es="Datos hist&oacute;ricos" data-en="Historical data">Datos hist&oacute;ricos</h4>
+<ul>
+  <li><strong>Coin Metrics API:</strong> HashRate y PriceUSD diarios desde 2011 (LTC), 2010 (BTC), 2014 (DOGE). API gratuita sin clave.</li>
+  <li><strong>Blockchair API:</strong> Datos en vivo de dificultad, precio, transacciones y fees.</li>
+  <li><strong>Curvas de eficiencia:</strong> Evoluci&oacute;n de ASICs Scrypt (L3+ 1.6 J/MH, L7 0.36 J/MH, L9 0.20 J/MH) y SHA-256 (S9 120 J/TH, S21 17.5 J/TH).</li>
+  <li><strong>Halvings:</strong> LTC (2015, 2019, 2023), BTC (2012, 2016, 2020, 2024). DOGE sin halving (10,000 DOGE/bloque fijo).</li>
+</ul>
+
+<h4 id="m4" data-es="Comparativa BTC" data-en="BTC Comparison">Comparativa BTC</h4>
+<p id="btcPara" data-es="
+  El modelo de Bitcoin no necesita ajuste por merged-mining. Con un hashrate de 
+  962 EH/s, eficiencia de 18 J/TH, y recompensa de 3.125 BTC/bloque, el coste de 
+  producci&oacute;n es ~$53,136/BTC vs precio de ~$59,961/BTC (ratio 1.13x, rentable).
+" data-en="
+  Bitcoin's model needs no merged-mining adjustment. With 962 EH/s hashrate, 
+  18 J/TH efficiency, and 3.125 BTC/block reward, production cost is ~$53,136/BTC 
+  vs market price ~$59,961/BTC (1.13x ratio, profitable).
+">
+  El modelo de Bitcoin no necesita ajuste por merged-mining. Con un hashrate de
+  962 EH/s, eficiencia de 18 J/TH, y recompensa de 3.125 BTC/bloque, el coste de
+  producci&oacute;n es ~$53,136/BTC vs precio de ~$59,961/BTC (ratio 1.13x, rentable).
+</p>
+
+<h4 id="m5" data-es="Limitaciones" data-en="Limitations">Limitaciones</h4>
+<ul>
+  <li data-es="Precio electricidad fijo en $0.05/kWh (media global, var&iacute;a por regi&oacute;n)" data-en="Electricity price fixed at $0.05/kWh (global avg, varies by region)">
+    Precio electricidad fijo en $0.05/kWh (media global, var&iacute;a por regi&oacute;n)
+  </li>
+  <li data-es="Eficiencia basada en ASIC l&iacute;der, no en el promedio real de la red" data-en="Efficiency based on leading ASIC, not actual network average">
+    Eficiencia basada en ASIC l&iacute;der, no en el promedio real de la red
+  </li>
+  <li data-es="No incluye costes de capital (compra de ASICs) ni fees de pool" data-en="Does not include capital costs (ASIC purchase) or pool fees">
+    No incluye costes de capital (compra de ASICs) ni fees de pool
+  </li>
+  <li data-es="Fees hist&oacute;ricas no disponibles para el periodo completo" data-en="Historical fees not available for the full period">
+    Fees hist&oacute;ricas no disponibles para el periodo completo
+  </li>
+</ul>
+</div>
+</section>
+
+<footer>
+<div class="container">
+  <p data-es="Datos: Coin Metrics Community API &amp; Blockchair API" data-en="Data: Coin Metrics Community API &amp; Blockchair API">
+    Datos: Coin Metrics Community API &amp; Blockchair API
+  </p>
+  <p style="margin-top:4px">
+    <a href="https://docs.coinmetrics.io/api/v4" target="_blank">Coin Metrics</a> &middot;
+    <a href="https://blockchair.com/api" target="_blank">Blockchair</a> &middot;
+    <a href="https://github.com/" target="_blank">GitHub</a>
+  </p>
+  <p id="footerDate" style="margin-top:8px; font-size:12px; opacity:0.6" data-es="Actualizado: 27 junio 2026" data-en="Updated: June 27, 2026">
+    Actualizado: 27 junio 2026
+  </p>
+</div>
+</footer>
+
+<script>
+var lang = 'es';
+var chart = null;
+var priceSeries = null, costSeries = null, dogeSeries = null;
+var liveData = null;
+
+/* ---- Configuracion del modelo (supuestos que NO estan en vivo) ----
+   La eficiencia se mantiene como constante editable: no existe fuente
+   publica en vivo de eficiencia media de ASICs Scrypt (LTC/DOGE). */
+var CFG = {
+  eff_J_MH: 0.24,        // J/MH  (ASIC Scrypt lider; NO en vivo)
+  elec: 0.05,            // $/kWh (media global; NO en vivo)
+  overhead: 1.15,        // x1.15 (Galaxy Research; NO en vivo)
+  ltcReward: 6.25,
+  ltcBlocksDay: 576,
+  ltcBlockTime: 150,
+  dogeReward: 10000,
+  dogeBlocksDay: 1440,
+  btcEff_J_TH: 18.0,
+  btcReward: 3.125,
+  btcBlocksDay: 144
+};
+
+function fmtUSD(n, dec) {
+  if (n === null || n === undefined || isNaN(n)) return 'N/A';
+  var d = (dec === undefined) ? 2 : dec;
+  return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+function fmtUSDInt(n) {
+  if (n === null || n === undefined || isNaN(n)) return 'N/A';
+  return '$' + Math.round(n).toLocaleString('en-US');
+}
+function fmtSignedUSD(n) {
+  if (n === null || n === undefined || isNaN(n)) return 'N/A';
+  var sign = n < 0 ? '-' : '+';
+  return sign + '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtDate(dt, lg) {
+  return dt.toLocaleDateString(lg === 'es' ? 'es-ES' : 'en-US',
+    { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function applyLang() {
+  document.querySelectorAll('[data-' + lang + ']').forEach(function(el) {
+    var v = el.getAttribute('data-' + lang);
+    if (v !== null) el.innerHTML = v;
+  });
+  document.getElementById('langToggle').textContent = lang === 'es' ? 'English' : 'Espa\u00f1ol';
+}
+
+document.getElementById('langToggle').addEventListener('click', function() {
+  lang = lang === 'es' ? 'en' : 'es';
+  applyLang();
+});
+
+/* ---- Helpers de calculo (portado de adjusted_cost.py) ---- */
+async function fetchJSON(url, timeoutMs) {
+  var ctrl = new AbortController();
+  var timer = setTimeout(function() { ctrl.abort(); }, timeoutMs || 15000);
+  try {
+    var resp = await fetch(url, { signal: ctrl.signal, cache: 'no-store' });
+    clearTimeout(timer);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return await resp.json();
+  } catch (e) {
+    clearTimeout(timer);
+    throw e;
+  }
+}
+
+function hashrateMHFromDiff(stats, blockTime) {
+  var d = stats && stats.difficulty;
+  if (!d) return null;
+  return (Number(d) * Math.pow(2, 32) / blockTime) / 1e6;
+}
+
+function fees24h(stats) {
+  var f = stats && stats.average_transaction_fee_usd_24h;
+  var tx = stats && stats.transactions_24h;
+  if (f !== undefined && f !== null && tx !== undefined && tx !== null && Number(tx) > 0) {
+    return Number(f) * Number(tx);
+  }
+  return 0;
+}
+
+function revenueShares(ltcPrice, dogePrice, ltcFees, dogeFees) {
+  var ltcRev = CFG.ltcBlocksDay * CFG.ltcReward * ltcPrice + (ltcFees || 0);
+  var dogeRev = CFG.dogeBlocksDay * CFG.dogeReward * dogePrice + (dogeFees || 0);
+  var total = ltcRev + dogeRev;
+  if (total === 0) {
+    return { ltcShare: 0.5, dogeShare: 0.5, ltcRev: 0, dogeRev: 0, total: 0 };
+  }
+  return { ltcShare: ltcRev / total, dogeShare: dogeRev / total, ltcRev: ltcRev, dogeRev: dogeRev, total: total };
+}
+
+function ltcCosts(hashrateMH, eff, reward, ltcShare, dogeShare) {
+  var powerW = hashrateMH * eff;
+  var dailyElec = (powerW * 24 / 1000) * CFG.elec;
+  var dailyMined = CFG.ltcBlocksDay * reward;
+  var totalCost = dailyElec * CFG.overhead;
+  var costDoge = null;
+  if (dogeShare > 0 && ltcShare > 0) {
+    var effectiveMined = dailyMined / ltcShare;
+    costDoge = totalCost / effectiveMined;
+  }
+  return {
+    costElecOnly: dailyElec / dailyMined,
+    costTotal: totalCost / dailyMined,
+    costDoge: costDoge,
+    dailyCost: totalCost,
+    powerMW: powerW / 1e6
+  };
+}
+
+/* ---- Portado de data.py: recompensa y eficiencia segun fecha ---- */
+function ymd(dt) { return dt.getUTCFullYear() * 10000 + (dt.getUTCMonth() + 1) * 100 + dt.getUTCDate(); }
+function dayOfYearUTC(dt) {
+  var start = Date.UTC(dt.getUTCFullYear(), 0, 1);
+  return Math.floor((dt.getTime() - start) / 86400000) + 1;
+}
+function ltcRewardAtDate(dt) {
+  var v = ymd(dt), r = 50;
+  if (v >= 20111007) r = 50;
+  if (v >= 20150825) r = 25;
+  if (v >= 20190825) r = 12.5;
+  if (v >= 20230802) r = 6.25;
+  return r;
+}
+function ltcEffAtDate(dt) {
+  var y = dt.getUTCFullYear() + (dayOfYearUTC(dt) - 1) / 366.0;
+  if (y < 2013) return 20.0;
+  else if (y < 2014) return 5.0;
+  else if (y < 2015) return 1.5;
+  else if (y < 2016) return 0.8;
+  else if (y < 2018) return 0.5;
+  else if (y < 2020) return 0.40;
+  else if (y < 2022) return 0.36;
+  else if (y < 2024) return 0.32;
+  else if (y < 2025) return 0.28;
+  else return 0.24;
+}
+
+/* Reconstruye TODO el historico diario en vivo desde Coin Metrics.
+   Si falla, se conserva la foto historica de chart_data.js. */
+async function rebuildChartFromLive() {
+  if (!chart || !priceSeries) return;
+  try {
+    var base = 'https://community-api.coinmetrics.io/v4/timeseries/asset-metrics';
+    var res = await Promise.all([
+      fetchJSON(base + '?assets=ltc&metrics=HashRate,PriceUSD&frequency=1d&start_time=2011-10-07&page_size=10000&pretty=false', 30000),
+      fetchJSON(base + '?assets=doge&metrics=PriceUSD&frequency=1d&start_time=2013-12-08&page_size=10000&pretty=false', 30000)
+    ]);
+    var ltcData = (res[0] && res[0].data) || [];
+    var dogeData = (res[1] && res[1].data) || [];
+    if (!ltcData.length) return;
+
+    var dogeMap = {};
+    dogeData.forEach(function(r) {
+      if (r.PriceUSD) dogeMap[(r.time || '').slice(0, 10)] = Number(r.PriceUSD);
+    });
+
+    var priceData = [], costData = [], dogeOut = [];
+    ltcData.forEach(function(r) {
+      var dt = new Date(r.time);
+      if (isNaN(dt.getTime())) return;
+      var t = Math.floor(dt.getTime() / 86400000) * 86400;
+      var price = r.PriceUSD ? Number(r.PriceUSD) : null;
+      var hrMH = Number(r.HashRate || 0) * 1e6;
+      var eff = ltcEffAtDate(dt);
+      var reward = ltcRewardAtDate(dt);
+      var dp = dogeMap[(r.time || '').slice(0, 10)] || 0;
+      var shares = revenueShares(price || 0, dp, 0, 0);
+      var c = ltcCosts(hrMH, eff, reward, shares.ltcShare, shares.dogeShare);
+      if (price !== null && hrMH > 0) {
+        priceData.push({ time: t, value: price });
+        costData.push({ time: t, value: c.costTotal });
+        if (c.costDoge) dogeOut.push({ time: t, value: c.costDoge });
+      }
+    });
+
+    if (priceData.length) {
+      priceSeries.setData(priceData);
+      costSeries.setData(costData);
+      dogeSeries.setData(dogeOut);
+      chart.timeScale().fitContent();
+      updateChartLive();
+    }
+  } catch (e) { /* se conserva el historico de chart_data.js */ }
+}
+
+function btcProductionCost(hashrateTH) {
+  var powerW = hashrateTH * CFG.btcEff_J_TH;
+  var dailyElec = (powerW * 24 / 1000) * CFG.elec;
+  var dailyMined = CFG.btcBlocksDay * CFG.btcReward;
+  return dailyElec * CFG.overhead / dailyMined;
+}
+
+/* ---- Fetch en vivo + pintado ---- */
+async function fetchLive() {
+  var statusEl = document.getElementById('liveStatus');
+  statusEl.textContent = '\u23F3 actualizando...';
+  statusEl.style.color = 'var(--text2)';
+  try {
+    var results = await Promise.allSettled([
+      fetchJSON('https://api.blockchair.com/litecoin/stats'),
+      fetchJSON('https://api.blockchair.com/dogecoin/stats'),
+      fetchJSON('https://api.blockchair.com/bitcoin/stats')
+    ]);
+    var ltcStats = results[0].status === 'fulfilled' ? results[0].value.data : null;
+    var dogeStats = results[1].status === 'fulfilled' ? results[1].value.data : null;
+    var btcStats = results[2].status === 'fulfilled' ? results[2].value.data : null;
+    if (!ltcStats) throw new Error('Blockchair LTC no disponible');
+
+    var ltcPrice = Number(ltcStats.market_price_usd) || 0;
+    var dogePrice = dogeStats ? (Number(dogeStats.market_price_usd) || 0) : 0;
+
+    if (!ltcPrice || !dogePrice) {
+      try {
+        var cg = await fetchJSON('https://api.coingecko.com/api/v3/simple/price?ids=litecoin,dogecoin&vs_currencies=usd');
+        if (!ltcPrice && cg.litecoin) ltcPrice = cg.litecoin.usd;
+        if (!dogePrice && cg.dogecoin) dogePrice = cg.dogecoin.usd;
+      } catch (e) { /* respaldo de precios opcional */ }
+    }
+
+    var hashrateMH = hashrateMHFromDiff(ltcStats, CFG.ltcBlockTime);
+    var shares = revenueShares(ltcPrice, dogePrice,
+      fees24h(ltcStats), dogeStats ? fees24h(dogeStats) : 0);
+    var costs = ltcCosts(hashrateMH, CFG.eff_J_MH, CFG.ltcReward, shares.ltcShare, shares.dogeShare);
+
+    var btc = null;
+    if (btcStats) {
+      var btcPrice = Number(btcStats.market_price_usd) || 0;
+      var btcHashTH = (Number(btcStats.difficulty) * Math.pow(2, 32) / 600) / 1e12;
+      var btcC = btcProductionCost(btcHashTH);
+      btc = {
+        price: btcPrice,
+        hashrateEH: btcHashTH / 1e6,
+        cost: btcC,
+        ratio: btcC ? btcPrice / btcC : null,
+        gap: btcC ? btcPrice - btcC : null
+      };
+    }
+
+    liveData = {
+      ok: true,
+      when: new Date(),
+      ltcPrice: ltcPrice,
+      dogePrice: dogePrice,
+      hashratePH: hashrateMH / 1e9,
+      shares: shares,
+      costs: costs,
+      btc: btc
+    };
+
+    updateCards();
+    updateChartLive();
+    applyLang();
+    setStatus(true);
+    rebuildChartFromLive();
+  } catch (err) {
+    setStatus(false, err && err.message);
+  }
+}
+
+function setStatus(ok, msg) {
+  var el = document.getElementById('liveStatus');
+  if (ok && liveData) {
+    el.textContent = '\uD83D\uDFE2 EN VIVO \u00B7 ' + liveData.when.toLocaleTimeString();
+    el.style.color = 'var(--green)';
+  } else {
+    el.textContent = '\uD83D\uDD34 Sin conexi\u00F3n \u00B7 mostrando datos del 27 jun 2026' + (msg ? ' (' + msg + ')' : '');
+    el.style.color = 'var(--red)';
+  }
+}
+
+function updateCards() {
+  if (!liveData || !liveData.ok) return;
+  var d = liveData;
+  var cs = d.costs;
+
+  document.getElementById('statElecOnly').textContent = fmtUSD(cs.costElecOnly);
+  document.getElementById('statTotal').textContent = fmtUSD(cs.costTotal);
+  document.getElementById('statEff').textContent = fmtUSD(cs.costDoge);
+  document.getElementById('statPrice').textContent = fmtUSD(d.ltcPrice);
+
+  var dogePct = (d.shares.dogeShare * 100).toFixed(1);
+  document.getElementById('statEffSub').setAttribute('data-es', 'DOGE genera ' + dogePct + '% de los ingresos');
+  document.getElementById('statEffSub').setAttribute('data-en', 'DOGE generates ' + dogePct + '% of revenue');
+  document.getElementById('statPriceSub').setAttribute('data-es', fmtDate(d.when, 'es'));
+  document.getElementById('statPriceSub').setAttribute('data-en', fmtDate(d.when, 'en'));
+
+  var diffOnly = d.ltcPrice - cs.costTotal;
+  var diffDoge = d.ltcPrice - cs.costDoge;
+
+  var b1 = document.getElementById('heroBadge');
+  b1.className = 'badge' + (diffOnly >= 0 ? '' : ' red');
+  b1.setAttribute('data-es', 'LTC solo: ' + (diffOnly >= 0 ? 'RENTABLE' : 'NO rentable') + ' (' + fmtSignedUSD(diffOnly) + ')');
+  b1.setAttribute('data-en', 'LTC only: ' + (diffOnly >= 0 ? 'PROFITABLE' : 'NOT profitable') + ' (' + fmtSignedUSD(diffOnly) + ')');
+
+  var b2 = document.getElementById('heroBadge2');
+  b2.className = 'badge' + (diffDoge >= 0 ? '' : ' red');
+  b2.setAttribute('data-es', 'Con DOGE: ' + (diffDoge >= 0 ? 'Rentable' : 'No rentable') + ' (' + fmtSignedUSD(diffDoge) + ')');
+  b2.setAttribute('data-en', 'With DOGE: ' + (diffDoge >= 0 ? 'Profitable' : 'Not profitable') + ' (' + fmtSignedUSD(diffDoge) + ')');
+
+  var heroDesc = document.getElementById('heroDesc');
+  heroDesc.setAttribute('data-es',
+    'Los mineros de Litecoin gastan ~' + fmtUSD(cs.costTotal) + ' USD en electricidad por cada LTC minado. ' +
+    'Pero gracias al merged-mining con Dogecoin, el coste efectivo se reduce a solo ~' + fmtUSD(cs.costDoge) + '. ' +
+    'Sin DOGE, minar LTC ' + (diffOnly >= 0 ? 'ser\u00EDa rentable' : 'no ser\u00EDa rentable') + '.');
+  heroDesc.setAttribute('data-en',
+    'Litecoin miners spend ~' + fmtUSD(cs.costTotal) + ' USD in electricity per LTC mined. ' +
+    'But thanks to merged-mining with Dogecoin, the effective cost drops to just ~' + fmtUSD(cs.costDoge) + '. ' +
+    'Without DOGE, mining LTC ' + (diffOnly >= 0 ? 'would be profitable' : 'would not be profitable') + '.');
+
+  var mHr = document.getElementById('mHashrate');
+  if (mHr) mHr.textContent = d.hashratePH.toFixed(2) + ' PH/s';
+  var mRevLtc = document.getElementById('mRevLtc');
+  if (mRevLtc) mRevLtc.textContent = fmtUSDInt(d.shares.ltcRev) + ' (' + (d.shares.ltcShare * 100).toFixed(1) + '%)';
+  var mRevDoge = document.getElementById('mRevDoge');
+  if (mRevDoge) mRevDoge.textContent = fmtUSDInt(d.shares.dogeRev) + ' (' + (d.shares.dogeShare * 100).toFixed(1) + '%)';
+  var mTotalCost = document.getElementById('mTotalCost');
+  if (mTotalCost) mTotalCost.textContent = fmtUSDInt(cs.dailyCost);
+  var mEffCost = document.getElementById('mEffCost');
+  if (mEffCost) mEffCost.innerHTML = '<b>' + fmtUSD(cs.costDoge) + '</b>';
+
+  if (d.btc && document.getElementById('btcPara')) {
+    var b = d.btc;
+    document.getElementById('btcPara').setAttribute('data-es',
+      'El modelo de Bitcoin no necesita ajuste por merged-mining. Con un hashrate de ' +
+      b.hashrateEH.toFixed(0) + ' EH/s, eficiencia de ' + CFG.btcEff_J_TH.toFixed(1) + ' J/TH, y recompensa de ' +
+      CFG.btcReward + ' BTC/bloque, el coste de producci\u00F3n es ~' + fmtUSD(b.cost) + '/BTC vs precio de ~' +
+      fmtUSD(b.price) + '/BTC (ratio ' + (b.ratio ? b.ratio.toFixed(2) : 'N/A') + 'x, ' +
+      (b.gap >= 0 ? 'rentable' : 'no rentable') + ').');
+    document.getElementById('btcPara').setAttribute('data-en',
+      'Bitcoin\u2019s model needs no merged-mining adjustment. With ' + b.hashrateEH.toFixed(0) +
+      ' EH/s hashrate, ' + CFG.btcEff_J_TH.toFixed(1) + ' J/TH efficiency, and ' + CFG.btcReward +
+      ' BTC/block reward, production cost is ~' + fmtUSD(b.cost) + '/BTC vs market price ~' + fmtUSD(b.price) +
+      '/BTC (' + (b.ratio ? b.ratio.toFixed(2) : 'N/A') + 'x ratio, ' + (b.gap >= 0 ? 'profitable' : 'not profitable') + ').');
+  }
+
+  var fd = document.getElementById('footerDate');
+  if (fd) {
+    fd.setAttribute('data-es', 'Actualizado: ' + fmtDate(d.when, 'es'));
+    fd.setAttribute('data-en', 'Updated: ' + fmtDate(d.when, 'en'));
+  }
+}
+
+function updateChartLive() {
+  if (!chart || !priceSeries || !liveData || !liveData.ok) return;
+  var t = Math.floor(Date.now() / 86400000) * 86400;
+  try {
+    priceSeries.update({ time: t, value: liveData.ltcPrice });
+    costSeries.update({ time: t, value: liveData.costs.costTotal });
+    if (liveData.costs.costDoge) dogeSeries.update({ time: t, value: liveData.costs.costDoge });
+    chart.timeScale().fitContent();
+  } catch (e) { /* el punto en vivo no se pudo anadir; se conserva el historico */ }
+}
+
+function initChart() {
+  var container = document.getElementById('chart');
+  if (!container) return;
+
+  chart = LightweightCharts.createChart(container, {
+    layout: {
+      background: { color: '#131722' },
+      textColor: '#8b949e',
+    },
+    grid: {
+      vertLines: { color: '#2a2e39' },
+      horzLines: { color: '#2a2e39' },
+    },
+    crosshair: {
+      mode: 0,
+      vertLine: { color: '#8b949e', width: 1, style: 2 },
+      horzLine: { color: '#8b949e', width: 1, style: 2 },
+    },
+    timeScale: {
+      timeVisible: false,
+      borderColor: '#2a2e39',
+    },
+    rightPriceScale: {
+      borderColor: '#2a2e39',
+      scaleMargins: { top: 0.05, bottom: 0.05 },
+      mode: 1,
+    },
+  });
+
+  priceSeries = chart.addLineSeries({
+    color: '#26a69a',
+    lineWidth: 2,
+    priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+    title: 'LTC Price',
+    lastValueVisible: true,
+    priceLineVisible: false,
+  });
+
+  costSeries = chart.addLineSeries({
+    color: '#ef5350',
+    lineWidth: 1.5,
+    priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+    title: 'Cost w/o DOGE',
+    lastValueVisible: true,
+    priceLineVisible: false,
+  });
+
+  dogeSeries = chart.addLineSeries({
+    color: '#ffa726',
+    lineWidth: 1.5,
+    priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+    title: 'Cost w/ DOGE',
+    lastValueVisible: true,
+    priceLineVisible: false,
+  });
+
+  if (typeof CHART_DATA !== 'undefined' && CHART_DATA.length) {
+    var priceData = [];
+    var costData = [];
+    var dogeData = [];
+    for (var i = 0; i < CHART_DATA.length; i++) {
+      var p = CHART_DATA[i];
+      priceData.push({ time: p.time, value: p.price });
+      costData.push({ time: p.time, value: p.cost_only });
+      if (p.cost_doge) {
+        dogeData.push({ time: p.time, value: p.cost_doge });
+      }
+    }
+    priceSeries.setData(priceData);
+    costSeries.setData(costData);
+    if (dogeData.length) dogeSeries.setData(dogeData);
+    chart.timeScale().fitContent();
+  }
+
+  setupTooltip(priceSeries, costSeries, dogeSeries);
+  setupResize(container);
+}
+
+function setupTooltip(priceSeries, costSeries, dogeSeries) {
+  if (!chart) return;
+  var tooltip = document.createElement('div');
+  tooltip.style.cssText = [
+    'position:absolute;display:none;padding:8px 12px;background:#1c2333;',
+    'border:1px solid #30363d;border-radius:6px;font-size:12px;',
+    'font-family:"SF Mono","Fira Code",monospace;color:#e6edf3;',
+    'pointer-events:none;z-index:1000;box-shadow:0 4px 12px rgba(0,0,0,0.3);',
+    'white-space:nowrap;',
+  ].join('');
+  document.querySelector('.chart-container').appendChild(tooltip);
+
+  chart.subscribeCrosshairMove(function(param) {
+    if (!param.time || !param.point) {
+      tooltip.style.display = 'none';
+      return;
+    }
+    var sd = param.seriesData;
+    var pv = sd.get(priceSeries);
+    var cv = sd.get(costSeries);
+    var dv = sd.get(dogeSeries);
+    if (!pv) { tooltip.style.display = 'none'; return; }
+
+    var d = new Date((typeof param.time === 'object' ? param.time.timestamp : param.time) * 1000);
+    var timeStr = d.toLocaleDateString(lang === 'es' ? 'es' : 'en', { year: 'numeric', month: 'short', day: 'numeric' });
+    var html = '<div style="font-weight:700;margin-bottom:4px">' + timeStr + '</div>';
+    html += '<div><span style="color:#26a69a">\u25cf</span> Price: <b>$' + pv.value.toFixed(2) + '</b></div>';
+    if (cv) html += '<div><span style="color:#ef5350">\u25cf</span> ' + (lang === 'es' ? 'Coste (sin DOGE)' : 'Cost (no DOGE)') + ': <b>$' + cv.value.toFixed(2) + '</b></div>';
+    if (dv) html += '<div><span style="color:#ffa726">\u25cf</span> ' + (lang === 'es' ? 'Coste (con DOGE)' : 'Cost (w/ DOGE)') + ': <b>$' + dv.value.toFixed(2) + '</b></div>';
+    if (cv) {
+      var diff = pv.value - cv.value;
+      html += '<div style="border-top:1px solid #30363d;margin-top:4px;padding-top:4px">' +
+        (lang === 'es' ? 'LTC solo' : 'LTC-only') + ': <span style="color:' + (diff >= 0 ? '#3fb950' : '#f85149') + '">' + (diff >= 0 ? '+' : '') + '$' + diff.toFixed(2) + '</span></div>';
+    }
+    if (dv) {
+      var diff2 = pv.value - dv.value;
+      html += '<div>w/ DOGE: <span style="color:' + (diff2 >= 0 ? '#3fb950' : '#f85149') + '">' + (diff2 >= 0 ? '+' : '') + '$' + diff2.toFixed(2) + '</span></div>';
+    }
+    tooltip.innerHTML = html;
+
+    var rect = document.querySelector('.chart-container').getBoundingClientRect();
+    var x = param.point.x + rect.left;
+    var y = param.point.y + rect.top;
+    var tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+    var left = x + 15, top = y - th - 10;
+    if (left + tw > window.innerWidth - 20) left = x - tw - 15;
+    if (top < 10) top = y + 15;
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+    tooltip.style.display = 'block';
+  });
+}
+
+function setupResize(container) {
+  var ro = new ResizeObserver(function() {
+    if (chart) chart.applyOptions({ width: container.clientWidth });
+  });
+  ro.observe(container);
+}
+
+function waitAndInit() {
+  if (typeof LightweightCharts !== 'undefined' && typeof CHART_DATA !== 'undefined') {
+    initChart();
+    updateChartLive();
+  } else {
+    setTimeout(waitAndInit, 200);
+  }
+}
+waitAndInit();
+applyLang();
+fetchLive();
+setTimeout(function() {
+  if (!chart) {
+    document.getElementById('chart').innerHTML = '<div style="color:#f85149;padding:40px;text-align:center">Error: No se pudo cargar el gr&aacute;fico. Verifica que chart_data.js existe y la conexi&oacute;n a internet para la librer&iacute;a de gr&aacute;ficos.</div>';
+  }
+}, 10000);
+</script>
+
+</body>
+</html>
