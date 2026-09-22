@@ -203,18 +203,18 @@ footer a:hover { text-decoration: underline; }
 
 <h4 id="m1" data-es="F&oacute;rmula principal" data-en="Main formula">F&oacute;rmula principal</h4>
 <div class="formula">
-  Coste = <span class="hl">(Hashrate &times; Efficiency &times; Elec_Price &times; 24 &times; Overhead)</span><br>
+  <span data-es="Coste" data-en="Cost">Coste</span> = <span class="hl">(Hashrate &times; Efficiency &times; Elec_Price &times; 24 &times; Overhead)</span><br>
   <span style="padding-left:8px">/</span> (Blocks_per_day &times; Block_Reward)
 </div>
 
 <table>
 <tr><th data-es="Variable" data-en="Variable">Variable</th><th data-es="Valor" data-en="Value">Valor</th><th data-es="Fuente" data-en="Source">Fuente</th><th data-es="Tipo" data-en="Type">Tipo</th></tr>
-<tr><td data-es="Hashrate red LTC" data-en="LTC Network Hashrate">Hashrate red LTC</td><td id="mHashrate">2.72 PH/s</td><td>Blockchair</td><td>REAL</td></tr>
-<tr><td data-es="Eficiencia media" data-en="Avg Efficiency">Eficiencia media</td><td>0.240 J/MH</td><td data-es="Curva ASICs (L7-L9)" data-en="ASIC curve (L7-L9)">Curva ASICs (L7-L9)</td><td>ESTIMADO</td></tr>
-<tr><td data-es="Precio electricidad" data-en="Electricity Price">Precio electricidad</td><td>$0.05/kWh</td><td>EIA / Galaxy Research</td><td>ESTIMADO</td></tr>
-<tr><td data-es="Factor overhead" data-en="Overhead factor">Factor overhead</td><td>1.15x (15%)</td><td>Galaxy Research</td><td>ESTIMADO</td></tr>
-<tr><td data-es="Bloques/d&iacute;a LTC" data-en="LTC Blocks/day">Bloques/d&iacute;a LTC</td><td>576</td><td data-es="Protocolo (150s/bloque)" data-en="Protocol (150s/block)">Protocolo (150s/bloque)</td><td>PROTOCOLO</td></tr>
-<tr><td data-es="Recompensa bloque" data-en="Block reward">Recompensa bloque</td><td>6.25 LTC</td><td data-es="Halving 2023" data-en="2023 Halving">Halving 2023</td><td>PROTOCOLO</td></tr>
+<tr><td data-es="Hashrate red LTC" data-en="LTC Network Hashrate">Hashrate red LTC</td><td id="mHashrate">2.72 PH/s</td><td>Blockchair</td><td data-es="REAL" data-en="REAL">REAL</td></tr>
+<tr><td data-es="Eficiencia media" data-en="Avg Efficiency">Eficiencia media</td><td>0.240 J/MH</td><td data-es="Curva ASICs (L7-L9)" data-en="ASIC curve (L7-L9)">Curva ASICs (L7-L9)</td><td data-es="ESTIMADO" data-en="ESTIMATED">ESTIMADO</td></tr>
+<tr><td data-es="Precio electricidad" data-en="Electricity Price">Precio electricidad</td><td>$0.05/kWh</td><td>EIA / Galaxy Research</td><td data-es="ESTIMADO" data-en="ESTIMATED">ESTIMADO</td></tr>
+<tr><td data-es="Factor overhead" data-en="Overhead factor">Factor overhead</td><td>1.15x (15%)</td><td>Galaxy Research</td><td data-es="ESTIMADO" data-en="ESTIMATED">ESTIMADO</td></tr>
+<tr><td data-es="Bloques/d&iacute;a LTC" data-en="LTC Blocks/day">Bloques/d&iacute;a LTC</td><td>576</td><td data-es="Protocolo (150s/bloque)" data-en="Protocol (150s/block)">Protocolo (150s/bloque)</td><td data-es="PROTOCOLO" data-en="PROTOCOL">PROTOCOLO</td></tr>
+<tr><td data-es="Recompensa bloque" data-en="Block reward">Recompensa bloque</td><td>6.25 LTC</td><td data-es="Halving 2023" data-en="2023 Halving">Halving 2023</td><td data-es="PROTOCOLO" data-en="PROTOCOL">PROTOCOLO</td></tr>
 </table>
 
 <h4 id="m2" data-es="Ajuste por merged-mining DOGE" data-en="DOGE merged-mining adjustment">Ajuste por merged-mining DOGE</h4>
@@ -235,7 +235,7 @@ footer a:hover { text-decoration: underline; }
 <div class="formula">
   <span class="hl-cyan">LTC_share</span> = LTC_Revenue / (LTC_Revenue + DOGE_Revenue)<br>
   <span class="hl-yellow">DOGE_share</span> = DOGE_Revenue / (LTC_Revenue + DOGE_Revenue)<br><br>
-  <span class="hl-green">Coste_LTC_efectivo</span> = Total_Daily_Cost / (Daily_LTC_Mined / LTC_share)
+  <span class="hl-green" data-es="Coste_LTC_efectivo" data-en="Effective_LTC_Cost">Coste_LTC_efectivo</span> = Total_Daily_Cost / (Daily_LTC_Mined / LTC_share)
 </div>
 
 <table>
@@ -248,10 +248,10 @@ footer a:hover { text-decoration: underline; }
 
 <h4 id="m3" data-es="Datos hist&oacute;ricos" data-en="Historical data">Datos hist&oacute;ricos</h4>
 <ul>
-  <li><strong>Coin Metrics API:</strong> HashRate y PriceUSD diarios desde 2011 (LTC), 2010 (BTC), 2014 (DOGE). API gratuita sin clave.</li>
-  <li><strong>Blockchair API:</strong> Datos en vivo de dificultad, precio, transacciones y fees.</li>
-  <li><strong>Curvas de eficiencia:</strong> Evoluci&oacute;n de ASICs Scrypt (L3+ 1.6 J/MH, L7 0.36 J/MH, L9 0.20 J/MH) y SHA-256 (S9 120 J/TH, S21 17.5 J/TH).</li>
-  <li><strong>Halvings:</strong> LTC (2015, 2019, 2023), BTC (2012, 2016, 2020, 2024). DOGE sin halving (10,000 DOGE/bloque fijo).</li>
+  <li data-es="<strong>Coin Metrics API:</strong> HashRate y PriceUSD diarios desde 2011 (LTC), 2010 (BTC), 2014 (DOGE). API gratuita sin clave." data-en="<strong>Coin Metrics API:</strong> daily HashRate and PriceUSD since 2011 (LTC), 2010 (BTC), 2014 (DOGE). Free API, no key required."><strong>Coin Metrics API:</strong> HashRate y PriceUSD diarios desde 2011 (LTC), 2010 (BTC), 2014 (DOGE). API gratuita sin clave.</li>
+  <li data-es="<strong>Blockchair API:</strong> Datos en vivo de dificultad, precio, transacciones y fees." data-en="<strong>Blockchair API:</strong> live data on difficulty, price, transactions and fees."><strong>Blockchair API:</strong> Datos en vivo de dificultad, precio, transacciones y fees.</li>
+  <li data-es="<strong>Curvas de eficiencia:</strong> Evoluci&oacute;n de ASICs Scrypt (L3+ 1.6 J/MH, L7 0.36 J/MH, L9 0.20 J/MH) y SHA-256 (S9 120 J/TH, S21 17.5 J/TH)." data-en="<strong>Efficiency curves:</strong> evolution of Scrypt ASICs (L3+ 1.6 J/MH, L7 0.36 J/MH, L9 0.20 J/MH) and SHA-256 (S9 120 J/TH, S21 17.5 J/TH)."><strong>Curvas de eficiencia:</strong> Evoluci&oacute;n de ASICs Scrypt (L3+ 1.6 J/MH, L7 0.36 J/MH, L9 0.20 J/MH) y SHA-256 (S9 120 J/TH, S21 17.5 J/TH).</li>
+  <li data-es="<strong>Halvings:</strong> LTC (2015, 2019, 2023), BTC (2012, 2016, 2020, 2024). DOGE sin halving (10,000 DOGE/bloque fijo)." data-en="<strong>Halvings:</strong> LTC (2015, 2019, 2023), BTC (2012, 2016, 2020, 2024). DOGE has no halving (fixed 10,000 DOGE/block)."><strong>Halvings:</strong> LTC (2015, 2019, 2023), BTC (2012, 2016, 2020, 2024). DOGE sin halving (10,000 DOGE/bloque fijo).</li>
 </ul>
 
 <h4 id="m4" data-es="Comparativa BTC" data-en="BTC Comparison">Comparativa BTC</h4>
@@ -309,6 +309,26 @@ var chart = null;
 var priceSeries = null, costSeries = null, dogeSeries = null;
 var liveData = null;
 
+/* ---- Estado en vivo bilingüe ---- */
+var statusMode = 'loading';   // 'loading' | 'live' | 'offline'
+var statusMsg = null;
+function renderStatus() {
+  var el = document.getElementById('liveStatus');
+  if (!el) return;
+  if (statusMode === 'live' && liveData) {
+    el.textContent = (lang === 'es' ? '\uD83D\uDFE2 EN VIVO \u00B7 ' : '\uD83D\uDFE2 LIVE \u00B7 ') + liveData.when.toLocaleTimeString();
+    el.style.color = 'var(--green)';
+  } else if (statusMode === 'offline') {
+    el.textContent = (lang === 'es'
+      ? '\uD83D\uDD34 Sin conexi\u00F3n \u00B7 mostrando datos del 27 jun 2026'
+      : '\uD83D\uDD34 Offline \u00B7 showing data from Jun 27, 2026') + (statusMsg ? ' (' + statusMsg + ')' : '');
+    el.style.color = 'var(--red)';
+  } else {
+    el.textContent = lang === 'es' ? '\u23F3 cargando...' : '\u23F3 loading...';
+    el.style.color = 'var(--text2)';
+  }
+}
+
 /* ---- Configuracion del modelo (supuestos que NO estan en vivo) ----
    La eficiencia se mantiene como constante editable: no existe fuente
    publica en vivo de eficiencia media de ASICs Scrypt (LTC/DOGE). */
@@ -351,6 +371,12 @@ function applyLang() {
     if (v !== null) el.innerHTML = v;
   });
   document.getElementById('langToggle').textContent = lang === 'es' ? 'English' : 'Espa\u00f1ol';
+  renderStatus();
+  if (typeof priceSeries !== 'undefined' && priceSeries) {
+    priceSeries.applyOptions({ title: lang === 'es' ? 'Precio LTC' : 'LTC Price' });
+    costSeries.applyOptions({ title: lang === 'es' ? 'Coste (sin DOGE)' : 'Cost w/o DOGE' });
+    dogeSeries.applyOptions({ title: lang === 'es' ? 'Coste (con DOGE)' : 'Cost w/ DOGE' });
+  }
 }
 
 document.getElementById('langToggle').addEventListener('click', function() {
@@ -502,9 +528,9 @@ function btcProductionCost(hashrateTH) {
 
 /* ---- Fetch en vivo + pintado ---- */
 async function fetchLive() {
-  var statusEl = document.getElementById('liveStatus');
-  statusEl.textContent = '\u23F3 actualizando...';
-  statusEl.style.color = 'var(--text2)';
+  statusMode = 'loading';
+  statusMsg = null;
+  renderStatus();
   try {
     var results = await Promise.allSettled([
       fetchJSON('https://api.blockchair.com/litecoin/stats'),
@@ -568,14 +594,9 @@ async function fetchLive() {
 }
 
 function setStatus(ok, msg) {
-  var el = document.getElementById('liveStatus');
-  if (ok && liveData) {
-    el.textContent = '\uD83D\uDFE2 EN VIVO \u00B7 ' + liveData.when.toLocaleTimeString();
-    el.style.color = 'var(--green)';
-  } else {
-    el.textContent = '\uD83D\uDD34 Sin conexi\u00F3n \u00B7 mostrando datos del 27 jun 2026' + (msg ? ' (' + msg + ')' : '');
-    el.style.color = 'var(--red)';
-  }
+  statusMode = (ok && liveData) ? 'live' : 'offline';
+  statusMsg = msg || null;
+  renderStatus();
 }
 
 function updateCards() {
@@ -812,7 +833,7 @@ applyLang();
 fetchLive();
 setTimeout(function() {
   if (!chart) {
-    document.getElementById('chart').innerHTML = '<div style="color:#f85149;padding:40px;text-align:center">Error: No se pudo cargar el gr&aacute;fico. Verifica que chart_data.js existe y la conexi&oacute;n a internet para la librer&iacute;a de gr&aacute;ficos.</div>';
+    document.getElementById('chart').innerHTML = '<div style="color:#f85149;padding:40px;text-align:center">' + (lang === 'es' ? 'Error: No se pudo cargar el gr&aacute;fico. Verifica que chart_data.js existe y la conexi&oacute;n a internet para la librer&iacute;a de gr&aacute;ficos.' : 'Error: Could not load the chart. Check that chart_data.js exists and check your internet connection to the charting library.') + '</div>';
   }
 }, 10000);
 </script>
